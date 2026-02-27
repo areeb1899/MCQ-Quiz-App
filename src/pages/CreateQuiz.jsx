@@ -6,7 +6,7 @@ import QuestionUploader from '../components/QuestionUploader';
 import { parseExtractedText } from '../utils/textParser';
 
 const CreateQuiz = () => {
-    const { questions, addQuestion, removeQuestion, updateQuestion } = useQuizStore();
+    const { questions, addQuestion, removeQuestion, updateQuestion, clearAllQuestions } = useQuizStore();
 
     // Form State
     const [questionText, setQuestionText] = useState('');
@@ -265,9 +265,25 @@ const CreateQuiz = () => {
                         <h2 className="text-2xl font-bold text-slate-800">Question Bank</h2>
                         <p className="text-sm text-slate-500 mt-1 ">Review and manage your questions</p>
                     </div>
-                    <span className="bg-primary-100 text-primary-700 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border border-primary-200">
-                        {questions.length} Total
-                    </span>
+                    <div className="flex items-center gap-3">
+                        <span className="bg-primary-100 text-primary-700 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border border-primary-200">
+                            {questions.length} Total
+                        </span>
+                        {questions.length > 0 && (
+                            <button
+                                onClick={() => {
+                                    if (window.confirm('Are you sure you want to delete all questions?')) {
+                                        clearAllQuestions();
+                                    }
+                                }}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-transparent hover:border-red-200 flex items-center gap-1.5 cursor-pointer"
+                                title="Delete All Questions"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Delete All
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="space-y-4 overflow-y-auto pr-2 flex-grow  custom-scrollbar">
