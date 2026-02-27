@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -7,13 +7,18 @@ import {
     Home,
     CheckCircle2,
     XCircle,
-    MinusCircle
+    MinusCircle,
+    Share2
 } from 'lucide-react';
 import useQuizStore from '../stores/quizStore';
+import { toBlob } from 'html-to-image';
+import toast from 'react-hot-toast';
 
 const Result = () => {
     const { questions, userAnswers, currentScore, resetQuiz, calculateScore } = useQuizStore();
     const navigate = useNavigate();
+    const scoreCardRef = useRef(null);
+    const [isSharing, setIsSharing] = useState(false);
 
     // Ensure score is up-to-date
     useEffect(() => {
@@ -55,10 +60,74 @@ const Result = () => {
         bgGradient = "from-orange-500 to-orange-600";
     }
 
+    const handleShareImage = async () => {
+        if (!scoreCardRef.current || isSharing) return;
+
+        const toastId = toast.loading("Generating your score card...");
+        setIsSharing(true);
+
+        try {
+            const blob = await toBlob(scoreCardRef.current, {
+                backgroundColor: '#ffffff',
+                pixelRatio: 2, // better quality
+                filter: (node) => {
+                    // prevent data-html2canvas-ignore elements from being generated
+                    if (node?.hasAttribute && node.hasAttribute('data-html2canvas-ignore')) {
+                        return false;
+                    }
+                    return true;
+                }
+            });
+
+            if (!blob) throw new Error("Could not generate image blob");
+
+            const file = new File([blob], 'quiz-score.png', { type: 'image/png' });
+            toast.dismiss(toastId);
+
+            // Check if Web Share API with files is supported
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        title: 'My Quiz Result',
+                        files: [file]
+                    });
+                } catch (shareErr) {
+                    console.error("Native share failed:", shareErr);
+                    if (shareErr.name !== 'AbortError') {
+                        // Fallback to download
+                        downloadBlob(blob);
+                    }
+                }
+            } else {
+                console.warn("Web Share API not supported on this device/browser for files. Falling back to download.");
+                downloadBlob(blob);
+            }
+        } catch (err) {
+            console.error('Error in handleShareImage:', err);
+            toast.dismiss(toastId);
+            toast.error(err.message || "Failed to share or download the image");
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    const downloadBlob = (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'quiz-score.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("Score card downloaded!");
+    };
+
     return (
         <div className="max-w-4xl mx-auto py-8">
             {/* Score Header */}
             <motion.div
+                ref={scoreCardRef}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white rounded-3xl shadow-sm border border-border overflow-hidden mb-8"
@@ -86,7 +155,7 @@ const Result = () => {
                         You scored <strong className="text-slate-900">{currentScore} marks</strong> out of a possible {questions.length}.
                     </p>
 
-                    <div className="flex items-center justify-center gap-4">
+                    <div className="flex items-center justify-center gap-4" data-html2canvas-ignore>
                         <button
                             onClick={handleRetake}
                             className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-800 transition-all hover:shadow-lg active:scale-95"
@@ -100,6 +169,18 @@ const Result = () => {
                         >
                             <Home className="w-5 h-5" />
                             Home Page
+                        </button>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center gap-4 mt-8 pt-6 border-t border-slate-200/60" data-html2canvas-ignore>
+                        <p className={`text-sm font-semibold uppercase tracking-wider ${resultColor}`}>Share your result</p>
+                        <button
+                            onClick={handleShareImage}
+                            disabled={isSharing}
+                            className={`flex items-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-xl transition-all active:scale-95 ${isSharing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-50 hover:text-primary-600'}`}
+                        >
+                            <Share2 className="w-4 h-4" />
+                            {isSharing ? 'Generating...' : 'Share Score Image'}
                         </button>
                     </div>
                 </div>
